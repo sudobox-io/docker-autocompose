@@ -1,4 +1,11 @@
 # docker-autocompose
+
+# latest
+![Publish Docker-Image to GHRC.io](https://github.com/sudobox-io/docker-autocompose/workflows/Publish%20Docker-Image%20to%20GHRC.io/badge.svg?branch=master)
+# dev
+![Publish Docker-Image to GHRC.io](https://github.com/sudobox-io/docker-autocompose/workflows/Publish%20Docker-Image%20to%20GHRC.io/badge.svg?branch=dev)
+
+
 Generates a docker-compose yaml definition from a running container.
 
 Required Modules:
