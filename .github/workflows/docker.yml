@@ -1,18 +1,18 @@
-name: Publish Releases to Hub
+name: Publish Docker-Image to GHRC.io
 on:
   push:
     branches-ignore:
       - 'dependabot/**'
 
 jobs:
-  docker:
+  GHRC:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
       - uses: FranzDiebold/github-env-vars-action@v2
-      - name: Print environment variables exposed by this action
+      - name: Print environment variables
         run: |
           echo "CI_REPOSITORY_SLUG=$CI_REPOSITORY_SLUG"
           echo "CI_REPOSITORY_OWNER=$CI_REPOSITORY_OWNER"
@@ -38,25 +38,12 @@ jobs:
           echo "CI_RUN_NUMBER=$CI_RUN_NUMBER"
           echo "CI_WORKFLOW=$CI_WORKFLOW"
           echo "CI_ACTION=$CI_ACTION"
-      - name: Print environment variables exposed by GitHub
-        run: |
-          echo "GITHUB_ACTOR=$GITHUB_ACTOR"
-          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
-          echo "GITHUB_SHA=$GITHUB_SHA"
-          echo "GITHUB_REF=$GITHUB_REF"
-          echo "GITHUB_HEAD_REF=$GITHUB_HEAD_REF"
-          echo "GITHUB_BASE_REF=$GITHUB_BASE_REF"
-          echo "GITHUB_EVENT_NAME=$GITHUB_EVENT_NAME"
-          echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
-          echo "GITHUB_RUN_NUMBER=$GITHUB_RUN_NUMBER"
-          echo "GITHUB_WORKFLOW=$GITHUB_WORKFLOW"
-          echo "GITHUB_ACTION=$GITHUB_ACTION"
 
-      - name: Prepare
+      - name: Prepare GHRC
         id: prep
         run: |
           REPO=$CI_REPOSITORY_NAME
-          DOCKER_IMAGE=${{ secrets.DOCKER_USER }}/${REPO}
+          DOCKER_IMAGE=${{ github.repository_owner }}/${REPO}
           if [ "$CI_REF_NAME" != "dev" ]; then
             VERSION=latest
           else
@@ -67,6 +54,9 @@ jobs:
           echo ::set-output name=title::${GITHUB_REPOSITORY}
           echo ::set-output name=version::${VERSION}
           echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo ::set-output name=source::https://github.com/${{ github.repository_owner }}/${REPO}
+          echo ::set-output name=maintainer::${{ github.repository_owner }}
+          echo ::set-output name=imagesource::linuxserver.io-alpine
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -85,22 +75,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      - name: Login to DockerHub
+      - name: Login to GHRC Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v1 
         with:
-          username: ${{ secrets.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
 
-#      - name: Login to GitHub Container Registry
-#        if: github.event_name != 'pull_request'
-#        uses: docker/login-action@v1 
-#       with:
-#          registry: ghcr.io
-#          username: ${{ github.repository_owner }}
-#          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
+      - name: Build and push GHRC
         id: docker_build
         uses: docker/build-push-action@v2
         with:
@@ -109,11 +92,11 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/armhf,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.prep.outputs.tags }}
+          tags: ghcr.io/${{ steps.prep.outputs.tags }}
           labels: |
             org.opencontainers.image.title=${{ steps.prep.outputs.title }}
             org.opencontainers.image.version=${{ steps.prep.outputs.version }}
-            org.opencontainers.image.date=${{ steps.prep.outputs.date }}
-
-      - name: Image digest
-        run: echo ${{ steps.docker_build.outputs.digest }}
+            org.opencontainers.image.created=${{ steps.prep.outputs.date }}
+            org.opencontainers.image.source=${{ steps.prep.outputs.source }}
+            org.opencontainers.image.maintainer=${{ steps.prep.outputs.maintainer }}
+            org.opencontainers.image.imagesource=${{ steps.prep.outputs.imagesource }}
